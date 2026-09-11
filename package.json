@@ -1,0 +1,24 @@
+{
+  "name": "masti-malai-ott",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Masti Malai OTT — Entertainment Ka Full Tadka. Monorepo (backend + web).",
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev --workspace @masti/api",
+    "dev:web": "npm run dev --workspace @masti/web",
+    "dev:admin": "npm run dev --workspace @masti/admin",
+    "db:generate": "npm run prisma:generate --workspace @masti/api",
+    "db:migrate": "npm run prisma:migrate --workspace @masti/api",
+    "db:push": "npm run prisma:push --workspace @masti/api",
+    "seed": "npm run seed --workspace @masti/api",
+    "seed:admin": "npm run seed:admin --workspace @masti/api"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

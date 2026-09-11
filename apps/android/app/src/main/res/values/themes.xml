@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- A minimal Material3 theme; Compose supplies the real theming at runtime.
+         DayNight base keeps splash/system chrome dark-friendly. -->
+    <style name="Theme.MastiMalai" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#0B0B0F</item>
+        <item name="android:navigationBarColor">#0B0B0F</item>
+        <item name="android:windowBackground">#0B0B0F</item>
+    </style>
+</resources>

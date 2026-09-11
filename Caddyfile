@@ -1,0 +1,18 @@
+# Caddy reverse proxy — automatic HTTPS for all three sites.
+# Domain names come from .env.production (ROOT/WEB/API/ADMIN_DOMAIN).
+# Caddy gets + renews Let's Encrypt certs on its own; just point DNS at this box.
+
+# Consumer site: root domain + www both serve the web app.
+{$ROOT_DOMAIN}, {$WEB_DOMAIN} {
+    reverse_proxy web:3000
+}
+
+# Backend API.
+{$API_DOMAIN} {
+    reverse_proxy api:4000
+}
+
+# Admin panel.
+{$ADMIN_DOMAIN} {
+    reverse_proxy admin:3001
+}

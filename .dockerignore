@@ -1,0 +1,13 @@
+# Build context is the repo root (see docker-compose.prod.yml).
+# Keep dev secrets, deps and local media OUT of the image.
+**/node_modules
+**/.env
+**/.env.local
+.env.production
+**/storage-dev
+**/.next
+**/dist
+**/build
+apps/android
+**/*.log
+.git

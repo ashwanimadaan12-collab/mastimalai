@@ -1,0 +1,392 @@
+// Masti Malai OTT — core schema (Phase 1). See docs/ERD.md.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Access {
+  FREE
+  PREMIUM
+}
+
+enum ContentStatus {
+  DRAFT
+  PROCESSING
+  SCHEDULED
+  PUBLISHED
+  UNPUBLISHED
+  ARCHIVED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  PENDING
+  FAILED
+}
+
+enum PaymentStatus {
+  CREATED
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum AssetStatus {
+  UPLOADING
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum HomeSectionType {
+  HERO
+  CAROUSEL
+  TOP10
+  CONTINUE_WATCHING
+}
+
+enum CastRole {
+  ACTOR
+  DIRECTOR
+  PRODUCER
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  CONTENT_ADMIN
+  MARKETING_ADMIN
+  SUPPORT_ADMIN
+  ANALYST
+}
+
+model AdminUser {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  name         String
+  passwordHash String
+  role         AdminRole  @default(CONTENT_ADMIN)
+  isActive     Boolean    @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  auditLogs    AuditLog[]
+}
+
+model AuditLog {
+  id        String    @id @default(cuid())
+  adminId   String?
+  admin     AdminUser? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  adminName String
+  action    String // e.g. "movie.update"
+  entity    String // e.g. "Movie"
+  entityId  String?
+  summary   String
+  changes   Json?
+  createdAt DateTime  @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+model User {
+  id            String         @id @default(cuid())
+  mobile        String         @unique
+  email         String?        @unique
+  createdAt     DateTime       @default(now())
+  profiles      Profile[]
+  subscriptions Subscription[]
+  payments      Payment[]
+  refreshTokens RefreshToken[]
+}
+
+model Profile {
+  id        String          @id @default(cuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  isKids    Boolean         @default(false)
+  avatar    String?
+  language  String?
+  createdAt DateTime        @default(now())
+  progress  WatchProgress[]
+  watchlist WatchlistItem[]
+
+  @@index([userId])
+}
+
+model RefreshToken {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique
+  deviceName String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Genre {
+  id     String  @id @default(cuid())
+  name   String
+  slug   String  @unique
+  movies Movie[] @relation("MovieGenres")
+  series Series[] @relation("SeriesGenres")
+}
+
+model Language {
+  id     String   @id @default(cuid())
+  name   String
+  code   String   @unique
+  movies Movie[]
+  series Series[]
+}
+
+model VideoAsset {
+  id         String      @id @default(cuid())
+  status     AssetStatus @default(READY)
+  sourcePath String?
+  hlsPath    String?
+  streamUrl  String? // dev: direct HLS URL; prod: base for signed URL
+  renditions Json? // [{height:720, bandwidth:...}]
+  durationSec Int?
+  movie      Movie?
+  episode    Episode?
+}
+
+model Movie {
+  id            String        @id @default(cuid())
+  slug          String        @unique
+  title         String
+  description   String?
+  poster        String?
+  backdrop      String?
+  trailerUrl    String?
+  year          Int?
+  durationSec   Int?
+  ageRating     String?
+  rating        Float?
+  access        Access        @default(FREE)
+  status        ContentStatus @default(PUBLISHED)
+  isFeatured    Boolean       @default(false)
+  isTrending    Boolean       @default(false)
+  isTop10       Boolean       @default(false)
+  // Which client platforms this title is available on. Controlled from the CMS.
+  platforms     String[]      @default(["WEB", "ANDROID"])
+  publishAt     DateTime?
+  seoTitle      String?
+  seoDescription String?
+  ogImage       String?
+  createdAt     DateTime      @default(now())
+
+  languageId String?
+  language   Language? @relation(fields: [languageId], references: [id])
+  genres     Genre[]   @relation("MovieGenres")
+  cast       CastMember[]
+
+  videoAssetId String?     @unique
+  videoAsset   VideoAsset? @relation(fields: [videoAssetId], references: [id])
+
+  @@index([status])
+  @@index([languageId])
+  @@index([publishAt])
+}
+
+model Series {
+  id            String        @id @default(cuid())
+  slug          String        @unique
+  title         String
+  description   String?
+  poster        String?
+  backdrop      String?
+  trailerUrl    String?
+  year          Int?
+  ageRating     String?
+  access        Access        @default(FREE)
+  status        ContentStatus @default(PUBLISHED)
+  isFeatured    Boolean       @default(false)
+  isTrending    Boolean       @default(false)
+  isTop10       Boolean       @default(false)
+  platforms     String[]      @default(["WEB", "ANDROID"])
+  publishAt     DateTime?
+  seoTitle      String?
+  seoDescription String?
+  createdAt     DateTime      @default(now())
+
+  languageId String?
+  language   Language? @relation(fields: [languageId], references: [id])
+  genres     Genre[]   @relation("SeriesGenres")
+  cast       CastMember[]
+  seasons    Season[]
+
+  @@index([status])
+}
+
+model Season {
+  id       String    @id @default(cuid())
+  seriesId String
+  series   Series    @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  number   Int
+  title    String?
+  episodes Episode[]
+
+  @@unique([seriesId, number])
+}
+
+model Episode {
+  id          String        @id @default(cuid())
+  seasonId    String
+  season      Season        @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  number      Int
+  title       String
+  description String?
+  thumbnail   String?
+  durationSec Int?
+  introEndSec Int?
+  access      Access        @default(PREMIUM)
+  status      ContentStatus @default(PUBLISHED)
+  releaseAt   DateTime?
+
+  videoAssetId String?     @unique
+  videoAsset   VideoAsset? @relation(fields: [videoAssetId], references: [id])
+
+  @@unique([seasonId, number])
+  @@index([seasonId])
+}
+
+model CastMember {
+  id        String   @id @default(cuid())
+  name      String
+  character String?
+  role      CastRole @default(ACTOR)
+  order     Int      @default(0)
+  movieId   String?
+  movie     Movie?   @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  seriesId  String?
+  series    Series?  @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+}
+
+model WatchProgress {
+  id          String   @id @default(cuid())
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  movieId     String?
+  episodeId   String?
+  positionSec Int      @default(0)
+  durationSec Int      @default(0)
+  completed   Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@unique([profileId, movieId])
+  @@unique([profileId, episodeId])
+  @@index([profileId, updatedAt])
+}
+
+model WatchlistItem {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  movieId   String?
+  seriesId  String?
+  createdAt DateTime @default(now())
+
+  @@unique([profileId, movieId])
+  @@unique([profileId, seriesId])
+  @@index([profileId])
+}
+
+model SubscriptionPlan {
+  id                   String         @id @default(cuid())
+  name                 String
+  priceInPaise         Int
+  compareAtPriceInPaise Int?
+  currency             String         @default("INR")
+  durationDays         Int
+  description          String?
+  features             String[]
+  isActive             Boolean        @default(true)
+  isRecommended        Boolean        @default(false)
+  displayOrder         Int            @default(0)
+  // Which platforms this plan is offered on (e.g. web via Razorpay, Android via Play).
+  platforms            String[]       @default(["WEB", "ANDROID"])
+  subscriptions        Subscription[]
+  payments             Payment[]
+}
+
+model Subscription {
+  id        String             @id @default(cuid())
+  userId    String
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId    String
+  plan      SubscriptionPlan   @relation(fields: [planId], references: [id])
+  status    SubscriptionStatus @default(PENDING)
+  startedAt DateTime?
+  expiresAt DateTime?
+  createdAt DateTime           @default(now())
+
+  @@index([userId, status])
+}
+
+model Payment {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId      String
+  plan        SubscriptionPlan @relation(fields: [planId], references: [id])
+  orderId     String        @unique
+  paymentId   String?
+  amount      Int
+  currency    String        @default("INR")
+  status      PaymentStatus @default(CREATED)
+  gatewayMeta Json?
+  createdAt   DateTime      @default(now())
+
+  @@index([userId])
+}
+
+model HomeSection {
+  id           String            @id @default(cuid())
+  title        String
+  type         HomeSectionType   @default(CAROUSEL)
+  displayOrder Int               @default(0)
+  isActive     Boolean           @default(true)
+  items        HomeSectionItem[]
+  heroItems    HeroItem[]
+}
+
+model HomeSectionItem {
+  id        String      @id @default(cuid())
+  sectionId String
+  section   HomeSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  movieId   String?
+  seriesId  String?
+  order     Int         @default(0)
+
+  @@index([sectionId])
+}
+
+model HeroItem {
+  id          String       @id @default(cuid())
+  sectionId   String?
+  section     HomeSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  title       String
+  subtitle    String?
+  description String?
+  backdrop    String?
+  poster      String?
+  trailerUrl  String?
+  ctaLabel    String?
+  targetKind  String? // movie | series
+  targetSlug  String?
+  order       Int          @default(0)
+  isActive    Boolean      @default(true)
+  startAt     DateTime?
+  endAt       DateTime?
+}
